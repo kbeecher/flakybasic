@@ -26,7 +26,7 @@ pub fn run(
     while pc < program_size && running == true {
         let s = program.get(pc).unwrap();
 
-        match execute_line(&s.1, &mut pc, &mut running, variables, &mut stack, &program) {
+        match execute_indirect(&s.1, &mut pc, &mut running, variables, &mut stack, &program) {
             Some(e) => {
                 return Some(e);
             }
@@ -37,7 +37,42 @@ pub fn run(
     None
 }
 
-pub fn execute_line(
+pub fn execute_immediate(
+    statement: &Statement,
+    variables: &mut HashMap<char, i32>,
+    program: &mut Vec<(i32, Statement)>,
+) -> Option<BasicError> {
+    match statement.execute(variables) {
+        Err(e) => Some(e),
+
+        Ok(signal) => match signal {
+            None => None,
+
+            Some(ProgramSignal::List) => {
+                for line in program.iter() {
+                    println!("{} {}", line.0, line.1);
+                }
+
+                return None;
+            }
+
+            Some(ProgramSignal::Run) => {
+                return run(variables, program);
+            }
+
+            Some(ProgramSignal::Jump(_))
+            | Some(ProgramSignal::Call(_))
+            | Some(ProgramSignal::Return)
+            | Some(ProgramSignal::End) => {
+                return Some(BasicError::RuntimeError(String::from(
+                    "Cannot execute this command outside of a program.",
+                )));
+            }
+        },
+    }
+}
+
+pub fn execute_indirect(
     statement: &Statement,
     pc: &mut usize,
     running: &mut bool,
@@ -94,13 +129,15 @@ pub fn execute_line(
                 },
 
                 ProgramSignal::List => {
-                    for line in program.iter() {
-                        println!("{} {}", line.0, line.1);
-                    }
+                    return Some(BasicError::RuntimeError(String::from(
+                        "Cannot list a program during execution.",
+                    )));
                 }
 
                 ProgramSignal::Run => {
-                    run(variables, program);
+                    return Some(BasicError::RuntimeError(String::from(
+                        "Cannot run a program that's already in execution.",
+                    )));
                 }
 
                 ProgramSignal::End => {

@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    errors::BasicError, executor::execute_line, parser::parse_line, program::update_program,
+    errors::BasicError, executor::execute_immediate, parser::SourceReader, program::update_program,
     statement::Statement,
 };
 
@@ -22,15 +22,31 @@ struct Args {
     filename: Option<PathBuf>,
 }
 
+fn report_error(err: BasicError, line_num: Option<i32>) {
+    match err {
+        BasicError::SyntaxError(s) => {
+            print!("Syntax error: {}", s);
+            if let Some(n) = line_num {
+                print!(" in line {}", n);
+            }
+            println!()
+        }
+        BasicError::RuntimeError(s) => {
+            print!("Runtime error: {}", s);
+            if let Some(n) = line_num {
+                print!(" in line {}", n);
+            }
+            println!()
+        }
+    }
+}
+
 fn main() {
-    let mut pc = 0;
-    let mut running: bool;
-    let mut stack: Vec<usize> = Vec::new();
     let mut variables: HashMap<char, i32> = HashMap::new();
     let mut program: Vec<(i32, Statement)> = Vec::new();
 
     let mut input_line = String::new();
-    println!("ready.");
+    println!("Ready.");
 
     loop {
         input_line.clear();
@@ -39,31 +55,68 @@ fn main() {
             .read_line(&mut input_line)
             .expect("Failed to read line");
 
-        match parse_line(input_line.clone()) {
-            Ok(prog_line) => match prog_line.0 {
-                None => {
-                    running = true;
-                    match execute_line(
-                        &prog_line.1,
-                        &mut pc,
-                        &mut running,
-                        &mut variables,
-                        &mut stack,
-                        &program,
-                    ) {
-                        None => (),
-                        Some(e) => match e {
-                            BasicError::SyntaxError(e) => println!("{}", e),
-                            BasicError::RuntimeError(e) => println!("{}", e),
-                        },
+        //
+        // Parse line
+        //
+
+        let mut reader = SourceReader::new(input_line.clone());
+        reader.skip_ws();
+
+        // Get line number
+        let line_num: Option<i32> = match reader.is_digit() {
+            false => None,
+            true => {
+                let res = reader.get_number();
+                match res {
+                    Err(e) => {
+                        report_error(e, None);
+                        continue;
                     }
+                    Ok(n) => Some(n),
                 }
-                Some(line_num) => {
-                    update_program(&mut program, (line_num, prog_line.1));
+            }
+        };
+
+        // Build the statement
+        let statement: (Option<i32>, Statement) = match reader.build_statement() {
+            Ok(s) => match line_num {
+                Some(n) => (Some(n), s),
+                None => (None, s),
+            },
+            Err(e) => match line_num {
+                Some(n) => {
+                    report_error(e, Some(n));
+                    continue;
+                }
+                None => {
+                    report_error(e, None);
+                    continue;
                 }
             },
-            Err(e) => {
-                println!("Error: {}", e);
+        };
+
+        //
+        // Run the line or update the program?
+        //
+
+        if statement.0.is_some() {
+            // There's a line number, so update the program.
+            update_program(
+                &mut program,
+                (
+                    statement
+                        .0
+                        .expect("Unrecoverable error getting line number"),
+                    statement.1,
+                ),
+            );
+        } else {
+            // There's no line number, so execute it in immediate mode.
+            match execute_immediate(&statement.1, &mut variables, &mut program) {
+                None => (),
+                Some(err) => {
+                    report_error(err, None);
+                }
             }
         }
     }

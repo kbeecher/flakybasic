@@ -21,7 +21,7 @@ pub const RUN: &str = "run";
 pub const END: &str = "end";
 
 /// A structure used to track the parsing of a single statement.
-struct SourceReader {
+pub struct SourceReader {
     /// The source line
     line: String,
 
@@ -43,7 +43,7 @@ impl SourceReader {
     }
 
     /// Get an integer number at the current point in the line.
-    fn get_number(&mut self) -> Result<i32, BasicError> {
+    pub fn get_number(&mut self) -> Result<i32, BasicError> {
         self.skip_ws();
         let start_at = self.idx;
 
@@ -297,7 +297,7 @@ impl SourceReader {
 
     /// Skip whitespace until reaching either the end of the line or
     /// non-whitespace character.
-    fn skip_ws(&mut self) {
+    pub fn skip_ws(&mut self) {
         while !self.at_end() && self.is_space() {
             self.next();
         }
@@ -338,7 +338,7 @@ impl SourceReader {
         self.ch().is_whitespace()
     }
 
-    fn is_digit(&self) -> bool {
+    pub fn is_digit(&self) -> bool {
         self.ch().is_digit(10)
     }
 
@@ -355,7 +355,7 @@ impl SourceReader {
     }
 
     /// Compile the current line into a Statement.
-    fn build_statement(&mut self) -> Result<Statement, BasicError> {
+    pub fn build_statement(&mut self) -> Result<Statement, BasicError> {
         let keyword = self.get_keyword();
 
         let statement = match keyword {
@@ -415,7 +415,7 @@ impl SourceReader {
 
             _ => {
                 // Did it fail because the line is empty?
-                if self.at_end() {
+                if keyword.len() == 0 && self.at_end() {
                     return Ok(Statement::Empty);
                 }
 
@@ -434,27 +434,5 @@ impl SourceReader {
         }
 
         return statement;
-    }
-}
-
-pub fn parse_line(line: String) -> Result<(Option<i32>, Statement), BasicError> {
-    let mut reader = SourceReader::new(line);
-
-    reader.skip_ws();
-
-    let line_num: Option<i32> = match reader.is_digit() {
-        true => Some(reader.get_number()?),
-        false => None,
-    };
-
-    match reader.build_statement() {
-        Ok(s) => Ok((line_num, s)),
-        Err(e) => match line_num {
-            Some(n) => Err(BasicError::SyntaxError(format!(
-                "Syntax error in line {}: {}",
-                n, e
-            ))),
-            None => Err(e),
-        },
     }
 }
