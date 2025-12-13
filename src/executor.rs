@@ -1,14 +1,20 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufRead, BufReader, Write},
+};
 
 use crate::{
     errors::BasicError,
+    parser::SourceReader,
+    program::update_program,
     statement::{ProgramSignal, Statement, find_line},
 };
 
 /// Run a program from the beginning.
 ///
 /// # Arguments
-/// * `lines` - A mapping of line numbers to statements
+/// * `program` - The program to run
 /// * `variables` - The variables table
 ///
 pub fn run(
@@ -37,6 +43,12 @@ pub fn run(
     None
 }
 
+/// Execute a single statement immediately.
+///
+/// # Arguments
+/// * `statement` - The statement to execute
+/// * `variables` - The variable table
+/// * `program` - The current state of the program
 pub fn execute_immediate(
     statement: &Statement,
     variables: &mut HashMap<char, i32>,
@@ -60,6 +72,84 @@ pub fn execute_immediate(
                 return run(variables, program);
             }
 
+            Some(ProgramSignal::Load(filename)) => {
+                let src_file = match File::open(filename) {
+                    Ok(file) => file,
+                    Err(err) => return Some(BasicError::RuntimeError(format!("{}", err))),
+                };
+
+                let reader = BufReader::new(src_file);
+
+                for line in reader.lines() {
+                    match line {
+                        Err(err) => {
+                            return Some(BasicError::RuntimeError(format!(
+                                "File read error: {}",
+                                err
+                            )));
+                        }
+                        Ok(src_line) => {
+                            let mut reader = SourceReader::new(src_line.clone());
+                            reader.skip_ws();
+
+                            // Get line number
+                            if !reader.is_digit() {
+                                return Some(BasicError::RuntimeError(String::from(
+                                    "Line number missing in file",
+                                )));
+                            }
+
+                            let line_num = match reader.get_number() {
+                                Err(e) => {
+                                    return Some(e);
+                                }
+                                Ok(n) => n,
+                            };
+
+                            // Build the line
+                            let line: (i32, Statement) = match reader.build_statement() {
+                                Ok(s) => (line_num, s),
+                                Err(e) => {
+                                    return Some(e);
+                                }
+                            };
+
+                            // Update the program
+                            update_program(program, line);
+                        }
+                    }
+                }
+
+                println!("File loaded.");
+
+                return None;
+            }
+
+            Some(ProgramSignal::Save(filename)) => {
+                let mut file = match File::create(filename) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        return Some(BasicError::RuntimeError(format!("File read error: {}", e)));
+                    }
+                };
+
+                for line in program.iter() {
+                    match writeln!(file, "{} {}", line.0, line.1) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            return Some(BasicError::RuntimeError(format!(
+                                "File read error: {}",
+                                e
+                            )));
+                        }
+                    }
+                }
+
+                println!("File saved.");
+
+                return None;
+            }
+
             Some(ProgramSignal::Jump(_))
             | Some(ProgramSignal::Call(_))
             | Some(ProgramSignal::Return)
@@ -72,6 +162,15 @@ pub fn execute_immediate(
     }
 }
 
+/// Execute a line as part of a running program.
+///
+/// # Arguments
+/// * `statement` - The statement to execute
+/// * `pc` - Current program counter value
+/// * `running` - Flag indicating whether program is currently running
+/// * `variables` - The variable table
+/// * `stack` -  The call stack
+/// * `program` - The program being executed
 pub fn execute_indirect(
     statement: &Statement,
     pc: &mut usize,
@@ -137,6 +236,18 @@ pub fn execute_indirect(
                 ProgramSignal::Run => {
                     return Some(BasicError::RuntimeError(String::from(
                         "Cannot run a program that's already in execution.",
+                    )));
+                }
+
+                ProgramSignal::Load(_) => {
+                    return Some(BasicError::RuntimeError(String::from(
+                        "Cannot load a program during execution.",
+                    )));
+                }
+
+                ProgramSignal::Save(_) => {
+                    return Some(BasicError::RuntimeError(String::from(
+                        "Cannot save a program during execution.",
                     )));
                 }
 

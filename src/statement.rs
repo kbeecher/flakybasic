@@ -33,6 +33,8 @@ pub enum ProgramSignal {
     Call(i32),
     Return,
     List,
+    Load(String),
+    Save(String),
     Run,
     End,
 }
@@ -49,6 +51,8 @@ pub enum Statement {
     Gosub(i32),
     Return,
     List,
+    Load(String),
+    Save(String),
     Run,
     End,
 }
@@ -206,6 +210,12 @@ impl Statement {
 
             // List the program
             Self::List => return Ok(Some(ProgramSignal::List)),
+
+            // Load a program
+            Self::Load(filename) => return Ok(Some(ProgramSignal::Load(filename.clone()))),
+
+            // Save a program
+            Self::Save(filename) => return Ok(Some(ProgramSignal::Save(filename.clone()))),
 
             // Run the program
             Self::Run => return Ok(Some(ProgramSignal::Run)),

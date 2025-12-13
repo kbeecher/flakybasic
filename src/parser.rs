@@ -18,6 +18,8 @@ pub const GOSUB: &str = "gosub";
 pub const RETURN: &str = "return";
 pub const LIST: &str = "list";
 pub const RUN: &str = "run";
+pub const LOAD: &str = "load";
+pub const SAVE: &str = "save";
 pub const END: &str = "end";
 
 /// A structure used to track the parsing of a single statement.
@@ -410,6 +412,10 @@ impl SourceReader {
             LIST => Ok(Statement::List),
 
             RUN => Ok(Statement::Run),
+
+            LOAD => Ok(Statement::Load(self.get_string()?.to_string())),
+
+            SAVE => Ok(Statement::Save(self.get_string()?.to_string())),
 
             END => Ok(Statement::End),
 

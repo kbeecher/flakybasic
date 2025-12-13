@@ -8,6 +8,10 @@ Therefore, don't expect this to be a particularly good implementation. It's like
 
 ## Version History
 
+### v0.2.0
+
+Added the ability to `load` and `save` programs. Programs are saved in human-readable text format.
+
 ### v0.1.0
 
 A basic working version. Supports only the fundamental keywords:
@@ -25,7 +29,7 @@ A basic working version. Supports only the fundamental keywords:
 
 Some notable omissions to be filled in later versions:
 
-* No saving or loading of programs.
+* ~~No saving or loading of programs~~.
 * `print` and `input` accept only one argument.
 * `goto` and `gosub` accept only numbers.
 * No `clear` keyword.

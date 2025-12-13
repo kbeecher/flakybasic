@@ -68,11 +68,11 @@ fn main() {
             true => {
                 let res = reader.get_number();
                 match res {
+                    Ok(n) => Some(n),
                     Err(e) => {
                         report_error(e, None);
                         continue;
                     }
-                    Ok(n) => Some(n),
                 }
             }
         };
@@ -98,7 +98,7 @@ fn main() {
         //
         // Run the line or update the program?
         //
-
+        
         if statement.0.is_some() {
             // There's a line number, so update the program.
             update_program(
