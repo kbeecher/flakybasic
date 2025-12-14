@@ -98,7 +98,7 @@ fn main() {
         //
         // Run the line or update the program?
         //
-        
+
         if statement.0.is_some() {
             // There's a line number, so update the program.
             update_program(

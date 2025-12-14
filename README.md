@@ -8,6 +8,10 @@ Therefore, don't expect this to be a particularly good implementation. It's like
 
 ## Version History
 
+### v0.3.0
+
+The `print` command now takes an arbitrary number of arguments.
+
 ### v0.2.0
 
 Added the ability to `load` and `save` programs. Programs are saved in human-readable text format.
@@ -30,7 +34,7 @@ A basic working version. Supports only the fundamental keywords:
 Some notable omissions to be filled in later versions:
 
 * ~~No saving or loading of programs~~.
-* `print` and `input` accept only one argument.
+* ~~`print` and ~~`input` accept only one argument.
 * `goto` and `gosub` accept only numbers.
 * No `clear` keyword.
 * No loop construct.

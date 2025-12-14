@@ -43,7 +43,7 @@ pub enum ProgramSignal {
 pub enum Statement {
     Empty,
     Rem(String),
-    Print(Option<Expression>),
+    Print(Vec<Expression>),
     Let(char, Expression),
     If(Condition, Box<Statement>),
     Goto(i32),
@@ -76,30 +76,33 @@ impl Statement {
                 return Ok(None);
             }
 
-            // The print command with an expression.
-            Self::Print(Some(s)) => match s {
-                Expression::String(s) => {
-                    println!("{}", s)
+            // Print the supplied expressions (if any).
+            Self::Print(args) => {
+                for arg in args.iter() {
+                    match arg {
+                        Expression::String(s) => {
+                            print!("{}", s)
+                        }
+                        Expression::Integer(i) => {
+                            print!("{}", eval_expression(Expression::Integer(*i), variables)?);
+                        }
+                        Expression::Variable(c) => {
+                            print!("{}", eval_expression(Expression::Variable(*c), variables)?);
+                        }
+                        Expression::Operator(op, l_exp, r_exp) => {
+                            print!(
+                                "{}",
+                                eval_expression(
+                                    Expression::Operator(*op, l_exp.clone(), r_exp.clone()),
+                                    variables
+                                )?
+                            )
+                        }
+                    }
                 }
-                Expression::Integer(i) => {
-                    println!("{}", eval_expression(Expression::Integer(*i), variables)?);
-                }
-                Expression::Variable(c) => {
-                    println!("{}", eval_expression(Expression::Variable(*c), variables)?);
-                }
-                Expression::Operator(op, l_exp, r_exp) => {
-                    println!(
-                        "{}",
-                        eval_expression(
-                            Expression::Operator(*op, l_exp.clone(), r_exp.clone()),
-                            variables
-                        )?
-                    )
-                }
-            },
 
-            // A print command lacking an expression prints an empty line.
-            Self::Print(None) => println!(),
+                println!();
+            }
 
             // Variable assignment command.
             Self::Let(var, value) => match value {
@@ -242,8 +245,20 @@ impl Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Statement::Rem(c) => write!(f, "{} {}", REM, c),
-            Statement::Print(Some(exp)) => write!(f, "{} {}", PRINT, exp),
-            Statement::Print(None) => write!(f, "{}", PRINT),
+            Statement::Print(args) => {
+                let mut output = String::from(format!("{} ", PRINT));
+                let mut first = true;
+
+                for arg in args.iter() {
+                    if !first {
+                        output.push_str(", ");
+                    }
+                    output.push_str(&format!("{}", arg));
+                    first = false;
+                }
+
+                write!(f, "{}", output)
+            }
             Statement::Let(var, exp) => write!(f, "{} {}={}", LET, var, exp),
             Statement::If(con, stmnt) => write!(f, "{} {} {}", IF, con, stmnt),
             Statement::Goto(num) => write!(f, "{} {}", GOTO, num),
@@ -270,7 +285,7 @@ mod tests {
 
         lines.insert(
             10,
-            Statement::Print(Some(Expression::String(String::from("Hello, world!")))),
+            Statement::Print(vec![Expression::String(String::from("Hello, world!"))]),
         );
 
         match lines.get(&10).expect("Error").execute(&mut variables) {

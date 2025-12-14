@@ -362,20 +362,34 @@ impl SourceReader {
 
         let statement = match keyword {
             REM => {
-                // Although not currently used, rem statements are considered
-                // part of a program and will be used in future
                 let comment = self.get_text()?;
                 Ok(Statement::Rem(comment))
             }
             PRINT => {
-                if self.ch() == '"' {
-                    let msg = self.get_string()?.to_string();
-                    return Ok(Statement::Print(Some(Expression::String(msg))));
-                } else if !self.at_end() {
-                    Ok(Statement::Print(Some(self.get_expression()?)))
-                } else {
-                    Ok(Statement::Print(None))
+                let mut another = true;
+                let mut args: Vec<Expression> = Vec::new();
+
+                while another {
+                    another = false;
+
+                    if self.ch() == '"' {
+                        let msg = self.get_string()?.to_string();
+                        args.push(Expression::String(msg));
+                    } else if !self.at_end() {
+                        args.push(self.get_expression()?);
+                    }
+
+                    self.skip_ws();
+
+                    // More?
+                    if self.ch() == ',' {
+                        another = true;
+                        self.skip_token(String::from(","));
+                        self.skip_ws();
+                    }
                 }
+
+                Ok(Statement::Print(args))
             }
 
             LET => {
