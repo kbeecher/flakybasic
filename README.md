@@ -10,7 +10,10 @@ Therefore, don't expect this to be a particularly good implementation. It's like
 
 ### v0.3.0
 
-The `print` command now takes an arbitrary number of arguments.
+Enhancements:
+
+* Added a `for`-`next`[-`step`] loop.
+* The `print` command now takes an arbitrary number of arguments.
 
 ### v0.2.0
 
@@ -18,7 +21,7 @@ Added the ability to `load` and `save` programs. Programs are saved in human-rea
 
 ### v0.1.0
 
-A basic working version. Supports only the fundamental keywords:
+A basic working version. Supported only the fundamental keywords:
 
 * `rem`
 * `print`
@@ -31,12 +34,13 @@ A basic working version. Supports only the fundamental keywords:
 * `run`
 * `end`
 
-Some notable omissions to be filled in later versions:
+Notable omissions (some addressed in later versions):
 
 * ~~No saving or loading of programs~~.
-* ~~`print` and ~~`input` accept only one argument.
+* ~~`print` accepts only one argument.~~
+* `input` accepts only one argument.
 * `goto` and `gosub` accept only numbers.
 * No `clear` keyword.
-* No loop construct.
+* ~~No loop construct.~~
 * No functions.
 * Integers only, no floating point values.

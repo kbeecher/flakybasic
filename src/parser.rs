@@ -16,6 +16,10 @@ pub const THEN: &str = "then";
 pub const INPUT: &str = "input";
 pub const GOSUB: &str = "gosub";
 pub const RETURN: &str = "return";
+pub const FOR: &str = "for";
+pub const TO: &str = "to";
+pub const STEP: &str = "step";
+pub const NEXT: &str = "next";
 pub const LIST: &str = "list";
 pub const RUN: &str = "run";
 pub const LOAD: &str = "load";
@@ -365,6 +369,7 @@ impl SourceReader {
                 let comment = self.get_text()?;
                 Ok(Statement::Rem(comment))
             }
+
             PRINT => {
                 let mut another = true;
                 let mut args: Vec<Expression> = Vec::new();
@@ -422,6 +427,28 @@ impl SourceReader {
             GOSUB => Ok(Statement::Gosub(self.get_number()?)),
 
             RETURN => Ok(Statement::Return),
+
+            FOR => {
+                let var = self.get_char()?;
+                self.skip_token(String::from("="));
+                let start_val = self.get_expression()?;
+                self.skip_token(TO.to_string());
+                let end_val = self.get_expression()?;
+                self.skip_ws();
+
+                let step_val = match self.at_end() {
+                    true => None,
+                    false => {
+                        self.skip_token(STEP.to_string());
+                        self.skip_ws();
+                        Some(self.get_expression()?)
+                    }
+                };
+
+                Ok(Statement::For(var, start_val, end_val, step_val))
+            }
+
+            NEXT => Ok(Statement::Next),
 
             LIST => Ok(Statement::List),
 

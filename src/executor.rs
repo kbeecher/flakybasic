@@ -24,6 +24,7 @@ pub fn run(
     let mut pc = 0;
     let mut running = true;
     let mut stack: Vec<usize> = Vec::new();
+    let mut loop_stack: Vec<(char, i32, i32, usize)> = Vec::new();
 
     let program_size = program.len();
 
@@ -32,9 +33,25 @@ pub fn run(
     while pc < program_size && running == true {
         let s = program.get(pc).unwrap();
 
-        match execute_indirect(&s.1, &mut pc, &mut running, variables, &mut stack, &program) {
-            Some(e) => {
-                return Some(e);
+        match execute_indirect(
+            &s.1,
+            &mut pc,
+            &mut running,
+            variables,
+            &mut stack,
+            &mut loop_stack,
+            &program,
+        ) {
+            Some(err) => {
+                let wrapped_err = match err {
+                    BasicError::SyntaxError(e) => {
+                        BasicError::SyntaxError(format!("{} in line {}", e, s.0))
+                    }
+                    BasicError::RuntimeError(e) => {
+                        BasicError::RuntimeError(format!("{} in line {}", e, s.0))
+                    }
+                };
+                return Some(wrapped_err);
             }
             None => (),
         }
@@ -153,6 +170,8 @@ pub fn execute_immediate(
             Some(ProgramSignal::Jump(_))
             | Some(ProgramSignal::Call(_))
             | Some(ProgramSignal::Return)
+            | Some(ProgramSignal::StartLoop(_, _, _, _))
+            | Some(ProgramSignal::EndLoop)
             | Some(ProgramSignal::End) => {
                 return Some(BasicError::RuntimeError(String::from(
                     "Cannot execute this command outside of a program.",
@@ -177,6 +196,7 @@ pub fn execute_indirect(
     running: &mut bool,
     variables: &mut HashMap<char, i32>,
     stack: &mut Vec<usize>,
+    loop_stack: &mut Vec<(char, i32, i32, usize)>,
     program: &Vec<(i32, Statement)>,
 ) -> Option<BasicError> {
     match statement.execute(variables) {
@@ -227,27 +247,96 @@ pub fn execute_indirect(
                     }
                 },
 
+                ProgramSignal::StartLoop(var, start_val, end_val, maybe_step_val) => {
+                    // Are we entering the loop (i.e. is the var at the top of the
+                    // loop stack different from that in the current line? If so,
+                    // set up the stack entry.
+
+                    // If there's no step value. we default to 1. Exception: if
+                    // end_val < start_val, make step = -1.
+                    let step_val = match maybe_step_val {
+                        Some(v) => v,
+                        None => {
+                            if end_val < start_val {
+                                -1
+                            } else {
+                                1
+                            }
+                        }
+                    };
+
+                    // Step value can't be zero.
+                    if step_val == 0 {
+                        return Some(BasicError::RuntimeError(String::from(
+                            "Step value cannot be zero",
+                        )));
+                    }
+
+                    // Stack entry: (char, i32, i32, usize) =
+                    // variable, end_val, step_val, PC at for statement
+                    if loop_stack.is_empty()
+                        || loop_stack.last().expect("Error executing for").0 != var
+                    {
+                        variables.insert(var, start_val);
+                        loop_stack.push((var, end_val, step_val, *pc));
+                    }
+
+                    *pc += 1;
+                }
+
+                ProgramSignal::EndLoop => {
+                    // Increment the loop variable.
+                    match loop_stack.last() {
+                        None => {
+                            return Some(BasicError::RuntimeError(String::from(
+                                "Next without for.",
+                            )));
+                        }
+                        Some(entry) => {
+                            variables.insert(entry.0, variables[&entry.0] + entry.2);
+
+                            // Has it reached the end val? Positive stepping
+                            // means we must be above the end val; negative
+                            // stepping means we must be below the end val.
+                            let end_reached = match entry.2.is_negative() {
+                                true => variables[&entry.0] < entry.1,
+                                false => variables[&entry.0] > entry.1,
+                            };
+
+                            // If it's reached the end val, then pop the loop stack and
+                            // proceed to next line.
+                            if end_reached {
+                                loop_stack.pop();
+                                *pc += 1;
+                            } else {
+                                // Otherwise, jump to the top of the loop.
+                                *pc = entry.3;
+                            }
+                        }
+                    }
+                }
+
                 ProgramSignal::List => {
                     return Some(BasicError::RuntimeError(String::from(
-                        "Cannot list a program during execution.",
+                        "Cannot list a program during execution",
                     )));
                 }
 
                 ProgramSignal::Run => {
                     return Some(BasicError::RuntimeError(String::from(
-                        "Cannot run a program that's already in execution.",
+                        "Cannot run a program that's already in execution",
                     )));
                 }
 
                 ProgramSignal::Load(_) => {
                     return Some(BasicError::RuntimeError(String::from(
-                        "Cannot load a program during execution.",
+                        "Cannot load a program during execution",
                     )));
                 }
 
                 ProgramSignal::Save(_) => {
                     return Some(BasicError::RuntimeError(String::from(
-                        "Cannot save a program during execution.",
+                        "Cannot save a program during execution",
                     )));
                 }
 

@@ -8,7 +8,9 @@ use std::{
 use crate::{
     errors::BasicError,
     expression::{Condition, Expression, Relop, eval_expression},
-    parser::{END, GOSUB, GOTO, IF, INPUT, LET, LIST, PRINT, REM, RETURN, RUN},
+    parser::{
+        END, FOR, GOSUB, GOTO, IF, INPUT, LET, LIST, NEXT, PRINT, REM, RETURN, RUN, STEP, TO,
+    },
 };
 
 /// Find the index of the line with the given line number. The index can
@@ -32,6 +34,9 @@ pub enum ProgramSignal {
     Jump(i32),
     Call(i32),
     Return,
+    // Signal = var_name, start_val, end_val
+    StartLoop(char, i32, i32, Option<i32>),
+    EndLoop,
     List,
     Load(String),
     Save(String),
@@ -50,6 +55,8 @@ pub enum Statement {
     Input(char),
     Gosub(i32),
     Return,
+    For(char, Expression, Expression, Option<Expression>),
+    Next,
     List,
     Load(String),
     Save(String),
@@ -81,7 +88,7 @@ impl Statement {
                 for arg in args.iter() {
                     match arg {
                         Expression::String(s) => {
-                            print!("{}", s)
+                            print!("{}", s);
                         }
                         Expression::Integer(i) => {
                             print!("{}", eval_expression(Expression::Integer(*i), variables)?);
@@ -211,6 +218,24 @@ impl Statement {
             // Return from subroutine
             Self::Return => return Ok(Some(ProgramSignal::Return)),
 
+            // Begin next iteration of a loop
+            Self::For(var, start_val, end_val, maybe_step_val) => {
+                let step_val: Option<i32> = match maybe_step_val {
+                    None => None,
+                    Some(exp) => Some(eval_expression(exp.clone(), variables)?),
+                };
+
+                return Ok(Some(ProgramSignal::StartLoop(
+                    *var,
+                    eval_expression(start_val.clone(), variables)?,
+                    eval_expression(end_val.clone(), variables)?,
+                    step_val,
+                )));
+            }
+
+            // Evaluate whether to continue with another loop
+            Self::Next => return Ok(Some(ProgramSignal::EndLoop)),
+
             // List the program
             Self::List => return Ok(Some(ProgramSignal::List)),
 
@@ -265,10 +290,24 @@ impl Display for Statement {
             Statement::Input(var) => write!(f, "{} {}", INPUT, var),
             Statement::Gosub(num) => write!(f, "{} {}", GOSUB, num),
             Statement::Return => write!(f, "{}", RETURN),
+            Statement::For(var, start_val, end_val, step_val) => {
+                if let Some(v) = step_val {
+                    write!(
+                        f,
+                        "{} {}={} {} {} {} {}",
+                        FOR, var, start_val, TO, end_val, STEP, v
+                    )
+                } else {
+                    write!(f, "{} {}={} {} {}", FOR, var, start_val, TO, end_val)
+                }
+            }
+            Statement::Next => write!(f, "{}", NEXT),
             Statement::List => write!(f, "{}", LIST),
             Statement::Run => write!(f, "{}", RUN),
+            Statement::Load(_) => Ok(()),
+            Statement::Save(_) => Ok(()),
             Statement::End => write!(f, "{}", END),
-            _ => Err(std::fmt::Error),
+            Statement::Empty => Ok(()),
         }
     }
 }
