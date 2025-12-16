@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::{
-    errors::BasicError, executor::execute_immediate, parser::SourceReader, program::update_program,
-    statement::Statement,
+    errors::BasicError, executor::execute_immediate, expression::Number, parser::SourceReader,
+    program::update_program, statement::Statement,
 };
 
 mod errors;
@@ -42,7 +42,7 @@ fn report_error(err: BasicError, line_num: Option<i32>) {
 }
 
 fn main() {
-    let mut variables: HashMap<char, i32> = HashMap::new();
+    let mut variables: HashMap<char, Number> = HashMap::new();
     let mut program: Vec<(i32, Statement)> = Vec::new();
 
     let mut input_line = String::new();
@@ -66,7 +66,7 @@ fn main() {
         let line_num: Option<i32> = match reader.is_digit() {
             false => None,
             true => {
-                let res = reader.get_number();
+                let res = reader.get_integer();
                 match res {
                     Ok(n) => Some(n),
                     Err(e) => {

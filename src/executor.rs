@@ -6,6 +6,7 @@ use std::{
 
 use crate::{
     errors::BasicError,
+    expression::Number,
     parser::SourceReader,
     program::update_program,
     statement::{ProgramSignal, Statement, find_line},
@@ -18,7 +19,7 @@ use crate::{
 /// * `variables` - The variables table
 ///
 pub fn run(
-    variables: &mut HashMap<char, i32>,
+    variables: &mut HashMap<char, Number>,
     program: &Vec<(i32, Statement)>,
 ) -> Option<BasicError> {
     let mut pc = 0;
@@ -32,8 +33,7 @@ pub fn run(
     // alters running status (e.g. the 'end' command).
     while pc < program_size && running == true {
         let s = program.get(pc).unwrap();
-
-        match execute_indirect(
+        return execute_indirect(
             &s.1,
             &mut pc,
             &mut running,
@@ -41,20 +41,7 @@ pub fn run(
             &mut stack,
             &mut loop_stack,
             &program,
-        ) {
-            Some(err) => {
-                let wrapped_err = match err {
-                    BasicError::SyntaxError(e) => {
-                        BasicError::SyntaxError(format!("{} in line {}", e, s.0))
-                    }
-                    BasicError::RuntimeError(e) => {
-                        BasicError::RuntimeError(format!("{} in line {}", e, s.0))
-                    }
-                };
-                return Some(wrapped_err);
-            }
-            None => (),
-        }
+        );
     }
 
     None
@@ -68,7 +55,7 @@ pub fn run(
 /// * `program` - The current state of the program
 pub fn execute_immediate(
     statement: &Statement,
-    variables: &mut HashMap<char, i32>,
+    variables: &mut HashMap<char, Number>,
     program: &mut Vec<(i32, Statement)>,
 ) -> Option<BasicError> {
     match statement.execute(variables) {
@@ -116,7 +103,7 @@ pub fn execute_immediate(
                                 )));
                             }
 
-                            let line_num = match reader.get_number() {
+                            let line_num = match reader.get_integer() {
                                 Err(e) => {
                                     return Some(e);
                                 }
@@ -174,7 +161,7 @@ pub fn execute_immediate(
             | Some(ProgramSignal::EndLoop)
             | Some(ProgramSignal::End) => {
                 return Some(BasicError::RuntimeError(String::from(
-                    "Cannot execute this command outside of a program.",
+                    "Cannot execute this command outside of a program",
                 )));
             }
         },
@@ -194,7 +181,7 @@ pub fn execute_indirect(
     statement: &Statement,
     pc: &mut usize,
     running: &mut bool,
-    variables: &mut HashMap<char, i32>,
+    variables: &mut HashMap<char, Number>,
     stack: &mut Vec<usize>,
     loop_stack: &mut Vec<(char, i32, i32, usize)>,
     program: &Vec<(i32, Statement)>,
@@ -277,7 +264,7 @@ pub fn execute_indirect(
                     if loop_stack.is_empty()
                         || loop_stack.last().expect("Error executing for").0 != var
                     {
-                        variables.insert(var, start_val);
+                        variables.insert(var, Number::Integer(start_val));
                         loop_stack.push((var, end_val, step_val, *pc));
                     }
 
@@ -289,18 +276,21 @@ pub fn execute_indirect(
                     match loop_stack.last() {
                         None => {
                             return Some(BasicError::RuntimeError(String::from(
-                                "Next without for.",
+                                "Next without for",
                             )));
                         }
                         Some(entry) => {
-                            variables.insert(entry.0, variables[&entry.0] + entry.2);
+                            variables.insert(
+                                entry.0,
+                                variables[&entry.0.clone()] + Number::Integer(entry.2),
+                            );
 
                             // Has it reached the end val? Positive stepping
                             // means we must be above the end val; negative
                             // stepping means we must be below the end val.
                             let end_reached = match entry.2.is_negative() {
-                                true => variables[&entry.0] < entry.1,
-                                false => variables[&entry.0] > entry.1,
+                                true => variables[&entry.0] < Number::Integer(entry.1),
+                                false => variables[&entry.0] > Number::Integer(entry.1),
                             };
 
                             // If it's reached the end val, then pop the loop stack and
@@ -349,17 +339,11 @@ pub fn execute_indirect(
             // Wrap errors to give line number info to user.
             BasicError::SyntaxError(e) => {
                 let line = program.get(*pc).expect("Error").0;
-                return Some(BasicError::SyntaxError(format!(
-                    "Syntax error in {}: {}",
-                    line, e
-                )));
+                return Some(BasicError::SyntaxError(format!("{} in line {}", e, line)));
             }
             BasicError::RuntimeError(e) => {
                 let line = program.get(*pc).expect("Error").0;
-                return Some(BasicError::RuntimeError(format!(
-                    "Runtime error in {}: {}",
-                    line, e
-                )));
+                return Some(BasicError::RuntimeError(format!("{} in line {}", e, line)));
             }
         },
     }

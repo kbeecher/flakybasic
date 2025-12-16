@@ -2,7 +2,7 @@ use std::char;
 
 use crate::{
     errors::BasicError,
-    expression::{ArithOp, Condition, Expression, Relop},
+    expression::{ArithOp, Condition, Expression, Number, Relop},
     statement::Statement,
 };
 
@@ -48,8 +48,8 @@ impl SourceReader {
         }
     }
 
-    /// Get an integer number at the current point in the line.
-    pub fn get_number(&mut self) -> Result<i32, BasicError> {
+    /// Get a value that can only be a whole number (e.g. line number)
+    pub fn get_integer(&mut self) -> Result<i32, BasicError> {
         self.skip_ws();
         let start_at = self.idx;
 
@@ -61,10 +61,33 @@ impl SourceReader {
         self.skip_ws();
 
         match self.line[start_at..end_at].parse::<i32>() {
-            Ok(s) => Ok(s),
+            Ok(i) => Ok(i),
             Err(_) => Err(BasicError::SyntaxError(String::from(
                 "Error reading number",
             ))),
+        }
+    }
+
+    /// Get an integer or float at the current point in the line.
+    pub fn get_number(&mut self) -> Result<Number, BasicError> {
+        self.skip_ws();
+        let start_at = self.idx;
+
+        while self.is_digit() || self.ch() == '.' {
+            self.next();
+        }
+
+        let end_at = self.idx;
+        self.skip_ws();
+
+        match self.line[start_at..end_at].parse::<i32>() {
+            Ok(i) => Ok(Number::Integer(i)),
+            Err(_) => match self.line[start_at..end_at].parse::<f64>() {
+                Ok(f) => Ok(Number::Float(f)),
+                Err(_) => Err(BasicError::SyntaxError(String::from(
+                    "Error reading number",
+                ))),
+            },
         }
     }
 
@@ -251,14 +274,14 @@ impl SourceReader {
         }
 
         // Is it a (possibly negative) number?
-        let mut adjust: i32 = 1;
+        let mut adjust: Number = Number::Integer(1);
         if self.ch() == '-' {
             self.skip_token(String::from("-"));
-            adjust = -1;
+            adjust = Number::Integer(-1);
         }
 
         if self.is_digit() {
-            return Ok(Expression::Integer(self.get_number()? * adjust));
+            return Ok(Expression::Numeric(self.get_number()? * adjust));
         }
 
         // Is it a subexpression?
@@ -420,11 +443,11 @@ impl SourceReader {
                 ))
             }
 
-            GOTO => Ok(Statement::Goto(self.get_number()?)),
+            GOTO => Ok(Statement::Goto(self.get_integer()?)),
 
             INPUT => Ok(Statement::Input(self.get_char()?)),
 
-            GOSUB => Ok(Statement::Gosub(self.get_number()?)),
+            GOSUB => Ok(Statement::Gosub(self.get_integer()?)),
 
             RETURN => Ok(Statement::Return),
 

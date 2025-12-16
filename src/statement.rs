@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     errors::BasicError,
-    expression::{Condition, Expression, Relop, eval_expression},
+    expression::{Condition, Expression, Number, Relop, eval_expression},
     parser::{
         END, FOR, GOSUB, GOTO, IF, INPUT, LET, LIST, NEXT, PRINT, REM, RETURN, RUN, STEP, TO,
     },
@@ -34,7 +34,7 @@ pub enum ProgramSignal {
     Jump(i32),
     Call(i32),
     Return,
-    // Signal = var_name, start_val, end_val
+    // Signal = var_name, start_val, end_val, step_val
     StartLoop(char, i32, i32, Option<i32>),
     EndLoop,
     List,
@@ -74,7 +74,7 @@ impl Statement {
     /// * Either an optional program flow or an error
     pub fn execute(
         &self,
-        variables: &mut HashMap<char, i32>,
+        variables: &mut HashMap<char, Number>,
     ) -> Result<Option<ProgramSignal>, BasicError> {
         match self {
             Self::Empty => return Ok(None),
@@ -90,8 +90,8 @@ impl Statement {
                         Expression::String(s) => {
                             print!("{}", s);
                         }
-                        Expression::Integer(i) => {
-                            print!("{}", eval_expression(Expression::Integer(*i), variables)?);
+                        Expression::Numeric(n) => {
+                            print!("{}", n);
                         }
                         Expression::Variable(c) => {
                             print!("{}", eval_expression(Expression::Variable(*c), variables)?);
@@ -118,8 +118,8 @@ impl Statement {
                         "Can't assign strings to variables",
                     )));
                 }
-                Expression::Integer(i) => {
-                    variables.insert(*var, eval_expression(Expression::Integer(*i), variables)?);
+                Expression::Numeric(n) => {
+                    variables.insert(*var, *n);
                 }
                 Expression::Variable(c) => {
                     variables.insert(*var, eval_expression(Expression::Variable(*c), variables)?);
@@ -140,31 +140,33 @@ impl Statement {
             Self::If(condition, consequent) => match condition {
                 Condition::Boolean(l_exp, relop, r_exp) => {
                     // Evaluate the left-hand and right-hand expressions.
-                    let l_val: i32 = match l_exp {
+                    let l_val: Number = match l_exp {
                         Expression::String(_) => {
                             return Err(BasicError::RuntimeError(String::from(
                                 "Can't compare strings",
                             )));
                         }
-                        Expression::Integer(i) => {
-                            eval_expression(Expression::Integer(*i), variables)?
+                        Expression::Numeric(n) => {
+                            eval_expression(Expression::Numeric(*n), variables)?
                         }
+
                         Expression::Variable(v) => {
                             eval_expression(Expression::Variable(*v), variables)?
                         }
+
                         Expression::Operator(op, l_exp, r_exp) => eval_expression(
                             Expression::Operator(*op, l_exp.clone(), r_exp.clone()),
                             variables,
                         )?,
                     };
-                    let r_val: i32 = match r_exp {
+                    let r_val: Number = match r_exp {
                         Expression::String(_) => {
                             return Err(BasicError::RuntimeError(String::from(
                                 "Can't compare strings",
                             )));
                         }
-                        Expression::Integer(i) => {
-                            eval_expression(Expression::Integer(*i), variables)?
+                        Expression::Numeric(n) => {
+                            eval_expression(Expression::Numeric(*n), variables)?
                         }
                         Expression::Variable(v) => {
                             eval_expression(Expression::Variable(*v), variables)?
@@ -198,13 +200,18 @@ impl Statement {
 
                 match res {
                     // Parse the input into a number
-                    Ok(_) => match buffer.trim().parse() {
-                        Ok(n) => {
-                            variables.insert(*v, n);
+                    Ok(_) => match buffer.trim().parse::<i32>() {
+                        Ok(i) => {
+                            variables.insert(*v, Number::Integer(i));
                         }
-                        Err(_) => {
-                            return Err(BasicError::RuntimeError(String::from("Parse error")));
-                        }
+                        Err(_) => match buffer.trim().parse::<f64>() {
+                            Ok(f) => {
+                                variables.insert(*v, Number::Float(f));
+                            }
+                            Err(_) => {
+                                return Err(BasicError::RuntimeError(String::from("Parse error")));
+                            }
+                        },
                     },
                     Err(_) => {
                         return Err(BasicError::RuntimeError(String::from("Input error")));
@@ -222,15 +229,33 @@ impl Statement {
             Self::For(var, start_val, end_val, maybe_step_val) => {
                 let step_val: Option<i32> = match maybe_step_val {
                     None => None,
-                    Some(exp) => Some(eval_expression(exp.clone(), variables)?),
+                    Some(exp) => {
+                        let final_step_val = eval_expression(exp.clone(), variables)?;
+                        if !final_step_val.is_int() {
+                            return Err(BasicError::RuntimeError(String::from(
+                                "Values in for statement must be integers",
+                            )));
+                        } else {
+                            Some(final_step_val.int_value().expect("Type error"))
+                        }
+                    }
                 };
 
-                return Ok(Some(ProgramSignal::StartLoop(
-                    *var,
-                    eval_expression(start_val.clone(), variables)?,
-                    eval_expression(end_val.clone(), variables)?,
-                    step_val,
-                )));
+                let final_start_val = eval_expression(start_val.clone(), variables)?;
+                let final_end_val = eval_expression(end_val.clone(), variables)?;
+
+                if !final_start_val.is_int() || !final_end_val.is_int() {
+                    return Err(BasicError::RuntimeError(String::from(
+                        "Values in for statement must be integers",
+                    )));
+                } else {
+                    return Ok(Some(ProgramSignal::StartLoop(
+                        *var,
+                        final_start_val.int_value().expect("Type error"),
+                        final_end_val.int_value().expect("Type error"),
+                        step_val,
+                    )));
+                }
             }
 
             // Evaluate whether to continue with another loop
@@ -254,7 +279,7 @@ impl Statement {
         return Ok(None);
     }
 
-    fn eval_relop(&self, l_val: i32, relop: Relop, r_val: i32) -> bool {
+    fn eval_relop(&self, l_val: Number, relop: Relop, r_val: Number) -> bool {
         match relop {
             Relop::EQ => l_val == r_val,
             Relop::NEQ => l_val != r_val,
@@ -319,7 +344,7 @@ mod tests {
 
     #[test]
     fn prints_string() {
-        let mut variables: HashMap<char, i32> = HashMap::new();
+        let mut variables: HashMap<char, Number> = HashMap::new();
         let mut lines: HashMap<i32, Statement> = HashMap::new();
 
         lines.insert(
@@ -335,25 +360,28 @@ mod tests {
 
     #[test]
     fn assigns_variable() {
-        let mut variables: HashMap<char, i32> = HashMap::new();
+        let mut variables: HashMap<char, Number> = HashMap::new();
         let mut lines: HashMap<i32, Statement> = HashMap::new();
 
-        lines.insert(10, Statement::Let('A', Expression::Integer(42)));
+        lines.insert(
+            10,
+            Statement::Let('A', Expression::Numeric(Number::Integer(42))),
+        );
 
         match lines.get(&10).expect("Error").execute(&mut variables) {
             Ok(maybe_flow) => assert!(maybe_flow.is_none()),
             Err(e) => panic!("{}", e),
         }
 
-        assert_eq!(*variables.get(&'A').unwrap(), 42);
+        assert_eq!(*variables.get(&'A').unwrap(), Number::Integer(42));
     }
 
     #[test]
     fn evaluates_condition() {
-        let mut variables: HashMap<char, i32> = HashMap::new();
+        let mut variables: HashMap<char, Number> = HashMap::new();
         let mut lines: HashMap<i32, Statement> = HashMap::new();
 
-        variables.insert('A', 42);
+        variables.insert('A', Number::Integer(42));
 
         lines.insert(
             20,
@@ -361,9 +389,12 @@ mod tests {
                 Condition::Boolean(
                     Expression::Variable('A'),
                     Relop::EQ,
-                    Expression::Integer(42),
+                    Expression::Numeric(Number::Integer(42)),
                 ),
-                Box::new(Statement::Let('A', Expression::Integer(69))),
+                Box::new(Statement::Let(
+                    'A',
+                    Expression::Numeric(Number::Integer(69)),
+                )),
             ),
         );
 
@@ -372,21 +403,21 @@ mod tests {
             Err(e) => panic!("{}", e),
         }
 
-        assert_eq!(*variables.get(&'A').unwrap(), 69);
+        assert_eq!(*variables.get(&'A').unwrap(), Number::Integer(69));
     }
 
     #[test]
     fn evaluates_complex_expressions() {
-        let mut variables: HashMap<char, i32> = HashMap::new();
+        let mut variables: HashMap<char, Number> = HashMap::new();
         let mut lines: HashMap<i32, Statement> = HashMap::new();
 
         let exp = Expression::Operator(
             ArithOp::Add,
-            Some(Box::new(Expression::Integer(2))),
+            Some(Box::new(Expression::Numeric(Number::Integer(2)))),
             Some(Box::new(Expression::Operator(
                 ArithOp::Multiply,
-                Some(Box::new(Expression::Integer(3))),
-                Some(Box::new(Expression::Integer(4))),
+                Some(Box::new(Expression::Numeric(Number::Integer(3)))),
+                Some(Box::new(Expression::Numeric(Number::Integer(4)))),
             ))),
         );
 
@@ -397,19 +428,25 @@ mod tests {
             Err(e) => panic!("{}", e),
         }
 
-        assert_eq!(*variables.get(&'N').unwrap(), 14);
+        assert_eq!(*variables.get(&'N').unwrap(), Number::Integer(14));
     }
 
     #[test]
     fn branches_unconditionally() {
-        let mut variables: HashMap<char, i32> = HashMap::new();
+        let mut variables: HashMap<char, Number> = HashMap::new();
         let mut lines: HashMap<i32, Statement> = HashMap::new();
 
-        variables.insert('X', 1);
+        variables.insert('X', Number::Integer(1));
 
         lines.insert(10, Statement::Goto(30));
-        lines.insert(20, Statement::Let('X', Expression::Integer(2)));
-        lines.insert(30, Statement::Let('X', Expression::Integer(3)));
+        lines.insert(
+            20,
+            Statement::Let('X', Expression::Numeric(Number::Integer(2))),
+        );
+        lines.insert(
+            30,
+            Statement::Let('X', Expression::Numeric(Number::Integer(3))),
+        );
 
         match lines.get(&10).expect("Error").execute(&mut variables) {
             Ok(maybe_flow) => match maybe_flow.unwrap() {

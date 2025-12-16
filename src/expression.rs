@@ -1,12 +1,116 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use crate::errors::BasicError;
 
+/// A numeric value, either an integer or a float.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum Number {
+    Integer(i32),
+    Float(f64),
+}
+
+impl Number {
+    pub fn is_int(&self) -> bool {
+        match self {
+            Self::Integer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn int_value(&self) -> Result<i32, BasicError> {
+        match self {
+            Self::Integer(i) => Ok(*i),
+            _ => Err(BasicError::RuntimeError(String::from("Type error"))),
+        }
+    }
+}
+
+impl Add for Number {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match self {
+            Number::Integer(self_i) => match rhs {
+                Number::Integer(other_i) => Number::Integer(self_i + other_i),
+                Number::Float(other_f) => Number::Float(self_i as f64 + other_f),
+            },
+            Number::Float(self_f) => match rhs {
+                Number::Integer(other_i) => Number::Float(self_f + other_i as f64),
+                Number::Float(other_f) => Number::Float(self_f + other_f),
+            },
+        }
+    }
+}
+
+impl Sub for Number {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match self {
+            Number::Integer(self_i) => match rhs {
+                Number::Integer(other_i) => Number::Integer(self_i - other_i),
+                Number::Float(other_f) => Number::Float(self_i as f64 - other_f),
+            },
+            Number::Float(self_f) => match rhs {
+                Number::Integer(other_i) => Number::Float(self_f - other_i as f64),
+                Number::Float(other_f) => Number::Float(self_f - other_f),
+            },
+        }
+    }
+}
+
+impl Mul for Number {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match self {
+            Number::Integer(self_i) => match rhs {
+                Number::Integer(other_i) => Number::Integer(self_i * other_i),
+                Number::Float(other_f) => Number::Float(self_i as f64 * other_f),
+            },
+            Number::Float(self_f) => match rhs {
+                Number::Integer(other_i) => Number::Float(self_f * other_i as f64),
+                Number::Float(other_f) => Number::Float(self_f * other_f),
+            },
+        }
+    }
+}
+
+impl Div for Number {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match self {
+            Number::Integer(self_i) => match rhs {
+                Number::Integer(other_i) => Number::Integer(self_i / other_i),
+                Number::Float(other_f) => Number::Float(self_i as f64 / other_f),
+            },
+            Number::Float(self_f) => match rhs {
+                Number::Integer(other_i) => Number::Float(self_f / other_i as f64),
+                Number::Float(other_f) => Number::Float(self_f / other_f),
+            },
+        }
+    }
+}
+
+impl Display for Number {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Number::Integer(n) => write!(f, "{}", n),
+            Number::Float(n) => write!(f, "{}", n),
+        }
+    }
+}
+
 /// An expression in the language.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Expression {
     String(String),
-    Integer(i32),
+    Numeric(Number),
     Variable(char),
 
     /// An operator is a recursive binary tree where non-leaf nodes
@@ -30,7 +134,9 @@ fn override_precedence(op: &ArithOp, exp: &Expression) -> bool {
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expression::Integer(i) => write!(f, "{}", i),
+            Expression::Numeric(n) => write!(f, "{}", n),
+            //            Expression::Integer(i) => write!(f, "{}", i),
+            //            Expression::Float(n) => write!(f, "{}", n),
             Expression::Variable(c) => write!(f, "{}", c),
             Expression::String(s) => write!(f, "\"{}\"", s),
             Expression::Operator(op, l_exp, r_exp) => {
@@ -109,7 +215,7 @@ impl Display for Condition {
 }
 
 /// Arithmetic operators.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum ArithOp {
     Add,
     Subtract,
@@ -131,12 +237,12 @@ impl Display for ArithOp {
 /// Evaluate an expression and reduce it to a single integer value.
 pub fn eval_expression(
     root: Expression,
-    variables: &HashMap<char, i32>,
-) -> Result<i32, BasicError> {
+    variables: &HashMap<char, Number>,
+) -> Result<Number, BasicError> {
     match root {
-        Expression::Integer(i) => return Ok(i),
+        Expression::Numeric(n) => return Ok(n),
         Expression::Variable(c) => match variables.get(&c) {
-            Some(v) => return Ok(*v),
+            Some(v) => return Ok(v.clone()),
             _ => {
                 return Err(BasicError::RuntimeError(String::from(
                     "Unknown variable {}",
