@@ -14,17 +14,7 @@ use crate::{
     },
 };
 
-/// Find the index of the line with the given line number. The index can
-/// be used as a value for the Executor's program counter.
-pub fn find_line(program: &Vec<(i32, Statement)>, line_num: i32) -> Option<usize> {
-    for (pc, line) in program.iter().enumerate() {
-        if line.0 == line_num {
-            return Some(pc);
-        }
-    }
 
-    return None;
-}
 
 /// Actions that signal back to the executor that it should take action,
 /// either to alter flow of program control (e.g. via jumps, gosubs,
@@ -107,7 +97,7 @@ impl Statement {
                             )
                         }
                         Expression::Function(name, args) => {
-                            print!("{}", eval_function(name, args)?);
+                            print!("{}", eval_function(name, args, variables)?);
                         }
                     }
                 }
@@ -138,7 +128,7 @@ impl Statement {
                     );
                 }
                 Expression::Function(name, args) => {
-                    variables.insert(*var, eval_function(name, args)?);
+                    variables.insert(*var, eval_function(name, args, variables)?);
                 }
             },
 
@@ -163,7 +153,7 @@ impl Statement {
                             Expression::Operator(*op, l_exp.clone(), r_exp.clone()),
                             variables,
                         )?,
-                        Expression::Function(name, args) => eval_function(name, args)?,
+                        Expression::Function(name, args) => eval_function(name, args, variables)?,
                     };
 
                     let r_val: Number = match r_exp {
@@ -182,7 +172,7 @@ impl Statement {
                             Expression::Operator(*op, l_exp.clone(), r_exp.clone()),
                             variables,
                         )?,
-                        Expression::Function(name, args) => eval_function(name, args)?,
+                        Expression::Function(name, args) => eval_function(name, args, variables)?,
                     };
 
                     // Once the two expressions are evaluated, test the condition.
@@ -196,7 +186,7 @@ impl Statement {
             // Unconditional jump.
             Self::Goto(n) => return Ok(Some(ProgramSignal::Jump(*n))),
 
-            // Take input from the user. Current supports integer only.
+            // Take input from the user.
             Self::Input(v) => {
                 // Print a prompt.
                 print!("? ");

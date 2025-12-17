@@ -283,12 +283,22 @@ impl SourceReader {
                     identifier.push_str(&self.get_char()?.to_string());
                 }
 
-                // TODO Get args
+                // Get args
+                let mut args: Vec<Expression> = Vec::new();
                 self.skip_token("(".to_string());
-                self.skip_ws();
+
+                while self.ch() != ')' {
+                    args.push(self.get_expression()?);
+                    self.skip_ws();
+
+                    if self.ch() != ',' {
+                        self.skip_token(",".to_string());
+                    }
+                }
+
                 self.skip_token(")".to_string());
 
-                return Ok(Expression::Function(identifier, Vec::new()));
+                return Ok(Expression::Function(identifier, args));
             }
 
             // If we reach here, there was only one letter, so it's a variable

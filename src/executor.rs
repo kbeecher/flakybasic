@@ -8,8 +8,8 @@ use crate::{
     errors::BasicError,
     expression::Number,
     parser::SourceReader,
-    program::update_program,
-    statement::{ProgramSignal, Statement, find_line},
+    program::{find_line, update_program},
+    statement::{ProgramSignal, Statement},
 };
 
 /// Run a program from the beginning.

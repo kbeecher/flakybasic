@@ -287,7 +287,7 @@ pub fn eval_expression(
             }
         },
         Expression::Function(name, args) => {
-            return eval_function(&name, &args);
+            return eval_function(&name, &args, variables);
         }
         _ => panic!("Invalid type in expression"),
     }

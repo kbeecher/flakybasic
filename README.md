@@ -8,6 +8,13 @@ Therefore, don't expect this to be a particularly good implementation. It's like
 
 ## Version History
 
+### v0.4.0
+
+Enhancements:
+
+* Added support for floating-point values (`f64` internally).
+* Added support for functions, plus two functions to get the ball rolling: `rnd` and `int`.
+
 ### v0.3.0
 
 Enhancements:
@@ -42,6 +49,6 @@ Notable omissions and differences from the original TinyBASIC (some addressed in
 * `goto` and `gosub` accept only numbers.
 * No `clear` keyword.
 * ~~No loop construct.~~
-* No functions.
+* ~~No functions.~~
 * ~~Integers only, no floating point values.~~
 * `let` keyword not optional

@@ -1,5 +1,17 @@
 use crate::statement::Statement;
 
+/// Find the index of the line with the given line number. The index can
+/// be used as a value for the Executor's program counter.
+pub fn find_line(program: &Vec<(i32, Statement)>, line_num: i32) -> Option<usize> {
+    for (pc, line) in program.iter().enumerate() {
+        if line.0 == line_num {
+            return Some(pc);
+        }
+    }
+
+    return None;
+}
+
 pub fn update_program(program: &mut Vec<(i32, Statement)>, new_line: (i32, Statement)) {
     // The program is empty, so insert immediately.
     if program.len() == 0 {
