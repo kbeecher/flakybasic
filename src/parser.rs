@@ -268,9 +268,33 @@ impl SourceReader {
             )));
         }
 
-        // Is it a variable?
+        // Is it a variable or function call?
         if self.is_alpha() {
-            return Ok(Expression::Variable(self.get_char()?));
+            let mut identifier = String::new();
+
+            // Get first letter
+            identifier.push_str(&self.ch().to_string());
+
+            // Any more alphabetic characters?
+            self.next();
+            if self.is_alpha() {
+                // Yes, so it must be a function call.
+                while self.is_alpha() {
+                    identifier.push_str(&self.get_char()?.to_string());
+                }
+
+                // TODO Get args
+                self.skip_token("(".to_string());
+                self.skip_ws();
+                self.skip_token(")".to_string());
+
+                return Ok(Expression::Function(identifier, Vec::new()));
+            }
+
+            // If we reach here, there was only one letter, so it's a variable
+            return Ok(Expression::Variable(
+                identifier.chars().nth(0).expect("Error reading identifier"),
+            ));
         }
 
         // Is it a (possibly negative) number?
@@ -335,6 +359,7 @@ impl SourceReader {
     /// Skip past the specified token. If the specified token isn't found
     /// at the current point in the line, generate an error.
     fn skip_token(&mut self, token: String) -> Option<BasicError> {
+        // TODO Change token to &str?
         self.skip_ws();
 
         for c in token.chars() {

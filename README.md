@@ -34,7 +34,7 @@ A basic working version. Supported only the fundamental keywords:
 * `run`
 * `end`
 
-Notable omissions (some addressed in later versions):
+Notable omissions and differences from the original TinyBASIC (some addressed in later versions):
 
 * ~~No saving or loading of programs~~.
 * ~~`print` accepts only one argument.~~
@@ -43,4 +43,5 @@ Notable omissions (some addressed in later versions):
 * No `clear` keyword.
 * ~~No loop construct.~~
 * No functions.
-* Integers only, no floating point values.
+* ~~Integers only, no floating point values.~~
+* `let` keyword not optional

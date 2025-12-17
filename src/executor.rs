@@ -33,7 +33,7 @@ pub fn run(
     // alters running status (e.g. the 'end' command).
     while pc < program_size && running == true {
         let s = program.get(pc).unwrap();
-        return execute_indirect(
+        match execute_indirect(
             &s.1,
             &mut pc,
             &mut running,
@@ -41,7 +41,10 @@ pub fn run(
             &mut stack,
             &mut loop_stack,
             &program,
-        );
+        ) {
+            None => (),
+            Some(e) => return Some(e),
+        }
     }
 
     None

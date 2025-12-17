@@ -8,8 +8,9 @@ use std::{
 use crate::{
     errors::BasicError,
     expression::{Condition, Expression, Number, Relop, eval_expression},
+    function::eval_function,
     parser::{
-        END, FOR, GOSUB, GOTO, IF, INPUT, LET, LIST, NEXT, PRINT, REM, RETURN, RUN, STEP, TO,
+        END, FOR, GOSUB, GOTO, IF, INPUT, LET, LIST, NEXT, PRINT, REM, RETURN, RUN, STEP, THEN, TO,
     },
 };
 
@@ -105,6 +106,9 @@ impl Statement {
                                 )?
                             )
                         }
+                        Expression::Function(name, args) => {
+                            print!("{}", eval_function(name, args)?);
+                        }
                     }
                 }
 
@@ -133,6 +137,9 @@ impl Statement {
                         )?,
                     );
                 }
+                Expression::Function(name, args) => {
+                    variables.insert(*var, eval_function(name, args)?);
+                }
             },
 
             // If statement takes a condition and a consequent statement
@@ -149,16 +156,16 @@ impl Statement {
                         Expression::Numeric(n) => {
                             eval_expression(Expression::Numeric(*n), variables)?
                         }
-
                         Expression::Variable(v) => {
                             eval_expression(Expression::Variable(*v), variables)?
                         }
-
                         Expression::Operator(op, l_exp, r_exp) => eval_expression(
                             Expression::Operator(*op, l_exp.clone(), r_exp.clone()),
                             variables,
                         )?,
+                        Expression::Function(name, args) => eval_function(name, args)?,
                     };
+
                     let r_val: Number = match r_exp {
                         Expression::String(_) => {
                             return Err(BasicError::RuntimeError(String::from(
@@ -175,6 +182,7 @@ impl Statement {
                             Expression::Operator(*op, l_exp.clone(), r_exp.clone()),
                             variables,
                         )?,
+                        Expression::Function(name, args) => eval_function(name, args)?,
                     };
 
                     // Once the two expressions are evaluated, test the condition.
@@ -310,7 +318,7 @@ impl Display for Statement {
                 write!(f, "{}", output)
             }
             Statement::Let(var, exp) => write!(f, "{} {}={}", LET, var, exp),
-            Statement::If(con, stmnt) => write!(f, "{} {} {}", IF, con, stmnt),
+            Statement::If(con, stmnt) => write!(f, "{} {} {} {}", IF, con, THEN, stmnt),
             Statement::Goto(num) => write!(f, "{} {}", GOTO, num),
             Statement::Input(var) => write!(f, "{} {}", INPUT, var),
             Statement::Gosub(num) => write!(f, "{} {}", GOSUB, num),
@@ -452,6 +460,52 @@ mod tests {
             Ok(maybe_flow) => match maybe_flow.unwrap() {
                 ProgramSignal::Jump(f) => assert_eq!(f, 30),
                 _ => panic!("Wrong type of program flow"),
+            },
+            Err(e) => panic!("{}", e),
+        }
+    }
+
+    #[test]
+    fn loops() {
+        let mut variables: HashMap<char, Number> = HashMap::new();
+        let mut lines: HashMap<i32, Statement> = HashMap::new();
+
+        variables.insert('x', Number::Integer(0));
+
+        lines.insert(
+            10,
+            Statement::For(
+                'i',
+                Expression::Numeric(Number::Integer(1)),
+                Expression::Numeric(Number::Integer(10)),
+                None,
+            ),
+        );
+        lines.insert(
+            20,
+            Statement::Let(
+                'x',
+                Expression::Operator(
+                    ArithOp::Add,
+                    Some(Box::new(Expression::Variable('x'))),
+                    Some(Box::new(Expression::Numeric(Number::Integer(1)))),
+                ),
+            ),
+        );
+        lines.insert(30, Statement::Next);
+
+        let _ = lines.get(&10).expect("Error").execute(&mut variables);
+        let _ = lines.get(&20).expect("Error").execute(&mut variables);
+        let signal = lines.get(&30).expect("Error").execute(&mut variables);
+
+        match signal {
+            Ok(maybe_signal) => match maybe_signal {
+                Some(ProgramSignal::EndLoop) => {
+                    if let Number::Integer(i) = variables.get(&'x').expect("Error") {
+                        assert_eq!(*i, 1);
+                    }
+                }
+                _ => panic!("Expected an end loop signal"),
             },
             Err(e) => panic!("{}", e),
         }

@@ -4,7 +4,7 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use crate::errors::BasicError;
+use crate::{errors::BasicError, function::eval_function};
 
 /// A numeric value, either an integer or a float.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
@@ -116,6 +116,9 @@ pub enum Expression {
     /// An operator is a recursive binary tree where non-leaf nodes
     /// are operators.
     Operator(ArithOp, Option<Box<Expression>>, Option<Box<Expression>>),
+
+    /// A function call with optional arguments
+    Function(String, Vec<Expression>),
 }
 
 fn override_precedence(op: &ArithOp, exp: &Expression) -> bool {
@@ -135,8 +138,6 @@ impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expression::Numeric(n) => write!(f, "{}", n),
-            //            Expression::Integer(i) => write!(f, "{}", i),
-            //            Expression::Float(n) => write!(f, "{}", n),
             Expression::Variable(c) => write!(f, "{}", c),
             Expression::String(s) => write!(f, "\"{}\"", s),
             Expression::Operator(op, l_exp, r_exp) => {
@@ -172,6 +173,23 @@ impl Display for Expression {
                 }
 
                 return Ok(());
+            }
+            Expression::Function(name, args) => {
+                let mut output = String::new();
+                let first = true;
+
+                output.push_str(&format!("{}(", name));
+
+                for a in args.iter() {
+                    if first {
+                        output.push_str(&format!("{}", a));
+                    } else {
+                        output.push_str(&format!(", {}", a));
+                    }
+                }
+
+                output.push_str(")");
+                write!(f, "{}", output)
             }
         }
     }
@@ -244,9 +262,10 @@ pub fn eval_expression(
         Expression::Variable(c) => match variables.get(&c) {
             Some(v) => return Ok(v.clone()),
             _ => {
-                return Err(BasicError::RuntimeError(String::from(
+                return Err(BasicError::RuntimeError(String::from(format!(
                     "Unknown variable {}",
-                )));
+                    c
+                ))));
             }
         },
         Expression::Operator(op, l_exp, r_exp) => match op {
@@ -267,6 +286,9 @@ pub fn eval_expression(
                     / eval_expression(*r_exp.unwrap(), variables)?);
             }
         },
+        Expression::Function(name, args) => {
+            return eval_function(&name, &args);
+        }
         _ => panic!("Invalid type in expression"),
     }
 }

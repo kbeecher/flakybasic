@@ -13,6 +13,7 @@ use crate::{
 mod errors;
 mod executor;
 mod expression;
+mod function;
 mod parser;
 mod program;
 mod statement;
