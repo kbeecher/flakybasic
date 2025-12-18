@@ -8,6 +8,12 @@ Therefore, don't expect this to be a particularly good implementation. It's like
 
 ## Version History
 
+### v0.5.0
+
+Enhancements:
+
+* Added `clear` keyword.
+
 ### v0.4.0
 
 Enhancements:
@@ -47,7 +53,7 @@ Notable omissions and differences from the original TinyBASIC (some addressed in
 * ~~`print` accepts only one argument.~~
 * `input` accepts only one argument.
 * `goto` and `gosub` accept only numbers.
-* No `clear` keyword.
+* ~~No `clear` keyword.~~
 * ~~No loop construct.~~
 * ~~No functions.~~
 * ~~Integers only, no floating point values.~~

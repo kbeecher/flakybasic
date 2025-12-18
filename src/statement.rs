@@ -10,11 +10,10 @@ use crate::{
     expression::{Condition, Expression, Number, Relop, eval_expression},
     function::eval_function,
     parser::{
-        END, FOR, GOSUB, GOTO, IF, INPUT, LET, LIST, NEXT, PRINT, REM, RETURN, RUN, STEP, THEN, TO,
+        CLEAR, END, FOR, GOSUB, GOTO, IF, INPUT, LET, LIST, NEXT, PRINT, REM, RETURN, RUN, STEP,
+        THEN, TO,
     },
 };
-
-
 
 /// Actions that signal back to the executor that it should take action,
 /// either to alter flow of program control (e.g. via jumps, gosubs,
@@ -32,6 +31,7 @@ pub enum ProgramSignal {
     Load(String),
     Save(String),
     Run,
+    ClearVars,
     End,
 }
 
@@ -52,6 +52,7 @@ pub enum Statement {
     Load(String),
     Save(String),
     Run,
+    Clear,
     End,
 }
 
@@ -271,6 +272,9 @@ impl Statement {
             // Run the program
             Self::Run => return Ok(Some(ProgramSignal::Run)),
 
+            // Clear all variables
+            Self::Clear => return Ok(Some(ProgramSignal::ClearVars)),
+
             Self::End => return Ok(Some(ProgramSignal::End)),
         }
 
@@ -330,6 +334,7 @@ impl Display for Statement {
             Statement::Load(_) => Ok(()),
             Statement::Save(_) => Ok(()),
             Statement::End => write!(f, "{}", END),
+            Statement::Clear => write!(f, "{}", CLEAR),
             Statement::Empty => Ok(()),
         }
     }

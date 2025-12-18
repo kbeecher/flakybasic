@@ -24,6 +24,7 @@ pub const LIST: &str = "list";
 pub const RUN: &str = "run";
 pub const LOAD: &str = "load";
 pub const SAVE: &str = "save";
+pub const CLEAR: &str = "clear";
 pub const END: &str = "end";
 
 /// A structure used to track the parsing of a single statement.
@@ -515,6 +516,8 @@ impl SourceReader {
             LOAD => Ok(Statement::Load(self.get_string()?.to_string())),
 
             SAVE => Ok(Statement::Save(self.get_string()?.to_string())),
+
+            CLEAR => Ok(Statement::Clear),
 
             END => Ok(Statement::End),
 

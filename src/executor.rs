@@ -72,12 +72,10 @@ pub fn execute_immediate(
                     println!("{} {}", line.0, line.1);
                 }
 
-                return None;
+                None
             }
 
-            Some(ProgramSignal::Run) => {
-                return run(variables, program);
-            }
+            Some(ProgramSignal::Run) => run(variables, program),
 
             Some(ProgramSignal::Load(filename)) => {
                 let src_file = match File::open(filename) {
@@ -129,7 +127,7 @@ pub fn execute_immediate(
 
                 println!("File loaded.");
 
-                return None;
+                None
             }
 
             Some(ProgramSignal::Save(filename)) => {
@@ -154,7 +152,13 @@ pub fn execute_immediate(
 
                 println!("File saved.");
 
-                return None;
+                None
+            }
+
+            Some(ProgramSignal::ClearVars) => {
+                variables.clear();
+
+                None
             }
 
             Some(ProgramSignal::Jump(_))
@@ -162,11 +166,9 @@ pub fn execute_immediate(
             | Some(ProgramSignal::Return)
             | Some(ProgramSignal::StartLoop(_, _, _, _))
             | Some(ProgramSignal::EndLoop)
-            | Some(ProgramSignal::End) => {
-                return Some(BasicError::RuntimeError(String::from(
-                    "Cannot execute this command outside of a program",
-                )));
-            }
+            | Some(ProgramSignal::End) => Some(BasicError::RuntimeError(String::from(
+                "Cannot execute this command outside of a program",
+            ))),
         },
     }
 }
@@ -307,6 +309,11 @@ pub fn execute_indirect(
                             }
                         }
                     }
+                }
+
+                ProgramSignal::ClearVars => {
+                    variables.clear();
+                    *pc += 1;
                 }
 
                 ProgramSignal::List => {
