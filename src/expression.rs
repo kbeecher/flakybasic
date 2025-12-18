@@ -121,6 +121,8 @@ pub enum Expression {
     Function(String, Vec<Expression>),
 }
 
+// Does this expression override the usual order of precedence by structuring
+// addops below mulops in the tree?
 fn override_precedence(op: &ArithOp, exp: &Expression) -> bool {
     match op {
         ArithOp::Multiply | ArithOp::Divide => match exp {
@@ -141,6 +143,8 @@ impl Display for Expression {
             Expression::Variable(c) => write!(f, "{}", c),
             Expression::String(s) => write!(f, "\"{}\"", s),
             Expression::Operator(op, l_exp, r_exp) => {
+                // Print left expression, adding parentheses if precedence
+                // is overridden.
                 if override_precedence(op, &l_exp.as_ref().unwrap()) {
                     let _ = write!(f, "(");
                 }
@@ -154,11 +158,14 @@ impl Display for Expression {
                     let _ = write!(f, ")");
                 }
 
+                // Print operator
                 match write!(f, "{}", op) {
                     Ok(_) => {}
                     Err(e) => return Err(e),
                 }
 
+                // Print right expression, adding parentheses if precedence
+                // is overridden.
                 if override_precedence(op, &r_exp.as_ref().unwrap()) {
                     let _ = write!(f, "(");
                 }
@@ -176,13 +183,14 @@ impl Display for Expression {
             }
             Expression::Function(name, args) => {
                 let mut output = String::new();
-                let first = true;
+                let mut first = true;
 
                 output.push_str(&format!("{}(", name));
 
                 for a in args.iter() {
                     if first {
                         output.push_str(&format!("{}", a));
+                        first = false;
                     } else {
                         output.push_str(&format!(", {}", a));
                     }

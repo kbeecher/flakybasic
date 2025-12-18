@@ -47,6 +47,8 @@ pub fn run(
         }
     }
 
+    println!("Ready.");
+
     None
 }
 
@@ -64,9 +66,11 @@ pub fn execute_immediate(
     match statement.execute(variables) {
         Err(e) => Some(e),
 
+        // Deal with any signal that came back.
         Ok(signal) => match signal {
             None => None,
 
+            // List the program
             Some(ProgramSignal::List) => {
                 for line in program.iter() {
                     println!("{} {}", line.0, line.1);
@@ -75,8 +79,10 @@ pub fn execute_immediate(
                 None
             }
 
+            // Run the program.
             Some(ProgramSignal::Run) => run(variables, program),
 
+            // Load a program from file.
             Some(ProgramSignal::Load(filename)) => {
                 let src_file = match File::open(filename) {
                     Ok(file) => file,
@@ -85,6 +91,7 @@ pub fn execute_immediate(
 
                 let reader = BufReader::new(src_file);
 
+                // Read the source file line by line...
                 for line in reader.lines() {
                     match line {
                         Err(err) => {
@@ -93,6 +100,7 @@ pub fn execute_immediate(
                                 err
                             )));
                         }
+                        // ...and build each one into a program line.
                         Ok(src_line) => {
                             let mut reader = SourceReader::new(src_line.clone());
                             reader.skip_ws();
@@ -130,6 +138,7 @@ pub fn execute_immediate(
                 None
             }
 
+            // Save the program to file.
             Some(ProgramSignal::Save(filename)) => {
                 let mut file = match File::create(filename) {
                     Ok(f) => f,
@@ -138,6 +147,7 @@ pub fn execute_immediate(
                     }
                 };
 
+                // Print each line to the file.
                 for line in program.iter() {
                     match writeln!(file, "{} {}", line.0, line.1) {
                         Ok(_) => (),
@@ -155,12 +165,14 @@ pub fn execute_immediate(
                 None
             }
 
+            // Clear all variables
             Some(ProgramSignal::ClearVars) => {
                 variables.clear();
 
                 None
             }
 
+            // These actions cannot be performed in immediate mode.
             Some(ProgramSignal::Jump(_))
             | Some(ProgramSignal::Call(_))
             | Some(ProgramSignal::Return)
@@ -197,7 +209,9 @@ pub fn execute_indirect(
                 *pc += 1;
             }
 
+            // Deal with any signal that came back.
             Some(f) => match f {
+                // Jump to another line in the program.
                 ProgramSignal::Jump(line_num) => match find_line(&program, line_num) {
                     Some(new_line) => {
                         *pc = new_line;
@@ -211,8 +225,11 @@ pub fn execute_indirect(
                     }
                 },
 
+                // Call a subroutine
                 ProgramSignal::Call(line_num) => {
+                    // Push current location to the stack for later return
                     stack.push(*pc);
+
                     match find_line(&program, line_num) {
                         Some(new_line) => *pc = new_line,
                         None => {
@@ -225,6 +242,8 @@ pub fn execute_indirect(
                     }
                 }
 
+                // Return from a subroutine. Pop the address from the stack to return
+                // to the original location, then increment to move to next line.
                 ProgramSignal::Return => match stack.pop() {
                     Some(address) => {
                         *pc = address;
@@ -239,6 +258,7 @@ pub fn execute_indirect(
                     }
                 },
 
+                // Start a loop, storing the loop context to the loop stack.
                 ProgramSignal::StartLoop(var, start_val, end_val, maybe_step_val) => {
                     // Are we entering the loop (i.e. is the var at the top of the
                     // loop stack different from that in the current line? If so,
@@ -276,6 +296,8 @@ pub fn execute_indirect(
                     *pc += 1;
                 }
 
+                // End of loop reached. Decide whether to loop again or
+                // exit the loop.
                 ProgramSignal::EndLoop => {
                     // Increment the loop variable.
                     match loop_stack.last() {
@@ -311,6 +333,7 @@ pub fn execute_indirect(
                     }
                 }
 
+                // Clear all variables.
                 ProgramSignal::ClearVars => {
                     variables.clear();
                     *pc += 1;
@@ -359,4 +382,103 @@ pub fn execute_indirect(
     }
 
     None
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn jumps_correctly() {
+        let program_src = vec![
+            "5 let a=3 / 1",
+            "10 goto 30",
+            "20 let a = 2 / 1",
+            "30 print a",
+        ];
+
+        let mut program: Vec<(i32, Statement)> = Vec::new();
+        let mut variables: HashMap<char, Number> = HashMap::new();
+
+        for src_line in program_src.iter() {
+            let mut reader = SourceReader::new(src_line.to_string());
+            let line_num = reader.get_integer().expect("Error letting line number");
+
+            match reader.build_statement() {
+                Ok(res) => program.push((line_num, res)),
+                Err(e) => panic!("{}", e),
+            }
+        }
+
+        match run(&mut variables, &program) {
+            Some(e) => panic!("{}", e),
+            None => {
+                if let Some(v) = variables.get(&'a') {
+                    assert_eq!(*v, Number::Integer(3));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn loops_and_calls_correctly() {
+        let program_src = vec![
+            "5 let n = 2 + (3*4)",
+            "10 for i = 1 to 3",
+            "20 gosub 100",
+            "30 next",
+            "40 end",
+            "100 n = n - 1",
+            "110 return",
+        ];
+
+        let mut program: Vec<(i32, Statement)> = Vec::new();
+        let mut variables: HashMap<char, Number> = HashMap::new();
+
+        for src_line in program_src.iter() {
+            let mut reader = SourceReader::new(src_line.to_string());
+            let line_num = reader.get_integer().expect("Error letting line number");
+
+            match reader.build_statement() {
+                Ok(res) => program.push((line_num, res)),
+                Err(e) => panic!("{}", e),
+            }
+        }
+
+        match run(&mut variables, &program) {
+            Some(e) => panic!("{}", e),
+            None => {
+                if let Some(v) = variables.get(&'n') {
+                    assert_eq!(*v, Number::Integer(11));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn loads_source_file() {
+        let mut reader = SourceReader::new(String::from("load \"examples/hello.bas\""));
+        let mut variables: HashMap<char, Number> = HashMap::new();
+        let mut program: Vec<(i32, Statement)> = Vec::new();
+
+        match reader.build_statement() {
+            Err(e) => panic!("{}", e),
+            Ok(stmt) => {
+                match execute_immediate(&stmt, &mut variables, &mut program) {
+                    Some(e) => panic!("{}", e),
+                    None => {
+                        assert_eq!(program.len(), 1);
+                        if let Some((n, p_stmt)) = program.get(0) {
+                            assert_eq!(*n, 10);
+                            if let Statement::Print(_) = p_stmt {
+                                // OK
+                            } else {
+                                panic!("Wrong statement");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

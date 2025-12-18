@@ -93,4 +93,19 @@ mod tests {
         assert_eq!(program[1].0, 15);
         assert_eq!(program[2].0, 20);
     }
+
+    #[test]
+    fn finds_line() {
+        let mut program: Vec<(i32, Statement)> = Vec::new();
+        let new_line_1 = (10, Statement::Rem(String::from("Infinite loop")));
+        let new_line_2 = (20, Statement::Goto(20));
+
+        update_program(&mut program, new_line_1);
+        update_program(&mut program, new_line_2);
+
+        match find_line(&program, 20) {
+            Some(s) => assert_eq!(s, 1),
+            None => panic!("Error finding line"),
+        }
+    }
 }

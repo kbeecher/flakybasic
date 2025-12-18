@@ -558,3 +558,156 @@ impl SourceReader {
         return statement;
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn new_reader(src: &str) -> SourceReader {
+        SourceReader::new(src.to_string())
+    }
+
+    #[test]
+    fn builds_rem() {
+        let mut reader = new_reader("rem This is a comment");
+
+        match reader.build_statement() {
+            Err(e) => panic!("{}", e),
+            Ok(s) => {
+                if let Statement::Rem(rs) = s {
+                    assert_eq!(rs, "This is a comment");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn builds_print() {
+        let mut reader = new_reader("print 2");
+
+        match reader.build_statement() {
+            Err(e) => panic!("{}", e),
+            Ok(s) => {
+                if let Statement::Print(exps) = s {
+                    assert_eq!(exps.len(), 1);
+                    match exps.get(0) {
+                        None => panic!("Print argument empty"),
+                        Some(e) => {
+                            if let Expression::Numeric(i) = e {
+                                assert!(i.is_int() && *i == Number::Integer(2))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn builds_let() {
+        let mut reader = new_reader("let x=1+(2*3)/4");
+
+        match reader.build_statement() {
+            Err(e) => panic!("{}", e),
+            Ok(s) => {
+                if let Statement::Let(var, exp) = s {
+                    assert_eq!(var, 'x');
+
+                    match exp {
+                        Expression::Operator(op, exp1, exp2) => {
+                            if let ArithOp::Add = op {
+                                assert!(exp1.is_some());
+                                assert!(exp2.is_some());
+                            }
+                        }
+                        _ => panic!("Problem with expression"),
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn builds_if() {
+        let mut reader = new_reader("if x > 1 then print 99");
+
+        match reader.build_statement() {
+            Err(e) => panic!("{}", e),
+            Ok(s) => {
+                if let Statement::If(cond, stmt) = s {
+                    match cond {
+                        Condition::Boolean(lexp, relop, rexp) => {
+                            if let Expression::Numeric(Number::Integer(1)) = rexp
+                                && let Relop::GT = relop
+                                && let Expression::Variable('x') = lexp
+                            {
+                                // OK
+                            } else {
+                                panic!("Error in condition");
+                            }
+                        }
+                    }
+
+                    match *stmt {
+                        Statement::Print(exps) => {
+                            assert_eq!(exps.len(), 1)
+                        }
+                        _ => panic!("Error in statement"),
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn builds_for() {
+        let mut reader = new_reader("for i = 1 to int(rnd() * 10)");
+
+        match reader.build_statement() {
+            Err(e) => panic!("{}", e),
+            Ok(s) => match s {
+                Statement::For(var, start, end, step) => {
+                    assert_eq!(var, 'i');
+                    if let Expression::Numeric(Number::Integer(1)) = start {
+                    } else {
+                        panic!("Error in variable");
+                    }
+                    if let Expression::Function(name, args) = end {
+                        assert_eq!(name, "int");
+                        assert_eq!(args.len(), 1);
+                    }
+                    assert!(step.is_none());
+                }
+                _ => panic!("Wrong statement"),
+            },
+        }
+    }
+
+    #[test]
+    fn builds_goto() {
+        let mut reader = new_reader("goto 9999");
+
+        match reader.build_statement() {
+            Err(e) => panic!("{}", e),
+            Ok(s) => {
+                if let Statement::Goto(num) = s {
+                    assert_eq!(num, 9999)
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn builds_load() {
+        let mut reader = new_reader("load \"test.bas\"");
+
+        match reader.build_statement() {
+            Err(e) => panic!("{}", e),
+            Ok(s) => {
+                if let Statement::Load(name) = s {
+                    assert_eq!(name, "test.bas")
+                }
+            }
+        }
+    }
+}
