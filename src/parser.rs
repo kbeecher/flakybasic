@@ -522,13 +522,27 @@ impl SourceReader {
             END => Ok(Statement::End),
 
             _ => {
-                // Did it fail because the line is empty?
-                if keyword.len() == 0 && self.at_end() {
-                    return Ok(Statement::Empty);
-                }
+                match keyword.len() {
+                    0 => {
+                        // Did it fail because the line is empty?
+                        if self.at_end() {
+                            return Ok(Statement::Empty);
+                        }
+                        return Err(BasicError::SyntaxError(String::from("Unknown keyword")));
+                    }
+                    1 => {
+                        // Is it a let statement without let?
+                        let var_name = keyword.chars().nth(0).expect("Error getting keyword");
+                        self.skip_token(String::from("="));
+                        let exp = self.get_expression()?;
 
-                // Otherwise, whatever is there isn't a recognisable keyword
-                return Err(BasicError::SyntaxError(String::from("Unknown keyword")));
+                        return Ok(Statement::Let(var_name, exp));
+                    }
+                    _ => {
+                        // Otherwise, whatever is there isn't a recognisable keyword
+                        return Err(BasicError::SyntaxError(String::from("Unknown keyword")));
+                    }
+                }
             }
         };
 

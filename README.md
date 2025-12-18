@@ -13,6 +13,7 @@ Therefore, don't expect this to be a particularly good implementation. It's like
 Enhancements:
 
 * Added `clear` keyword.
+* `let` keyword is now optional in assignments.
 
 ### v0.4.0
 
@@ -57,4 +58,4 @@ Notable omissions and differences from the original TinyBASIC (some addressed in
 * ~~No loop construct.~~
 * ~~No functions.~~
 * ~~Integers only, no floating point values.~~
-* `let` keyword not optional
+* ~~`let` keyword not optional~~

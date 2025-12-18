@@ -1,8 +1,6 @@
-use clap::Parser;
 use std::{
     collections::HashMap,
     io::{self},
-    path::PathBuf,
 };
 
 use crate::{
@@ -17,11 +15,6 @@ mod function;
 mod parser;
 mod program;
 mod statement;
-
-#[derive(Parser, Debug)]
-struct Args {
-    filename: Option<PathBuf>,
-}
 
 fn report_error(err: BasicError, line_num: Option<i32>) {
     match err {
